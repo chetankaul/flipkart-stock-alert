@@ -16,9 +16,13 @@
                 <label for="url">Flipkart URL</label>
                 <input type="url" id="url" name="url" placeholder="https://www.flipkart.com/..." required>
             </div>
-            <div class="form-group" style="flex:1">
+            <div class="form-group" style="flex:1.5">
                 <label for="label">Label (optional)</label>
                 <input type="text" id="label" name="label" placeholder="e.g. PS5 Digital">
+            </div>
+            <div class="form-group" style="flex:1">
+                <label for="target_price">Max Price ₹ (optional)</label>
+                <input type="number" id="target_price" name="target_price" step="any" min="1" placeholder="e.g. 45000">
             </div>
             <div class="form-group" style="flex:0 0 auto">
                 <label>&nbsp;</label>
@@ -38,6 +42,8 @@
             <thead>
                 <tr>
                     <th>Product</th>
+                    <th>Target Price</th>
+                    <th>Last Price</th>
                     <th>Status</th>
                     <th>Last Checked</th>
                     <th>Active</th>
@@ -49,7 +55,23 @@
                 <tr>
                     <td>
                         <div class="label-cell">{{ p.label or '—' }}</div>
-                        <div class="url-cell"><a href="{{ p.url }}" target="_blank">{{ p.url[:60] }}{% if p.url|length > 60 %}…{% endif %}</a></div>
+                        <div class="url-cell"><a href="{{ p.url }}" target="_blank">{{ p.url[:50] }}{% if p.url|length > 50 %}…{% endif %}</a></div>
+                    </td>
+                    <td>
+                        {% if p.target_price %}
+                            <span class="badge badge-cyan" title="Alerts trigger only if price drops to or below this amount">
+                                ≤ ₹{{ "{:,.0f}".format(p.target_price) }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-dim" title="Alerts trigger on any in-stock availability">Any Price</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.last_price %}
+                            <span style="font-family:var(--font-mono); font-weight:600; color:var(--text-bright)">{{ p.last_price }}</span>
+                        {% else %}
+                            <span class="time-ago">—</span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if p.last_status == 'in_stock' %}
@@ -76,9 +98,10 @@
                     </td>
                     <td>
                         <div class="actions">
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="openEditModal({{ p.id }}, '{{ p.label|escape }}', '{{ '{:.0f}'.format(p.target_price) if p.target_price else '' }}')" title="Edit label or target price">✏️</button>
                             <form action="{{ url_for('products.delete', pid=p.id) }}" method="post"
                                   onsubmit="return confirm('Remove this product?')">
-                                <button type="submit" class="btn btn-danger">✕</button>
+                                <button type="submit" class="btn btn-danger btn-sm" title="Delete product">✕</button>
                             </form>
                         </div>
                     </td>
@@ -94,5 +117,38 @@
     </div>
     {% endif %}
 </div>
+
+<!-- ── Edit Product Modal Dialog ──────────────────────────────────────── -->
+<dialog id="edit-product-dialog" class="tech-modal">
+    <div class="card-title" style="margin-bottom:1.25rem;">✏️ Edit Product Alert</div>
+    <form id="edit-product-form" method="post">
+        <div class="form-group" style="margin-bottom:1rem;">
+            <label for="edit-label">Product Label</label>
+            <input type="text" id="edit-label" name="label" placeholder="e.g. PS5 Digital">
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+            <label for="edit-target-price">Max Price ₹ (Leave blank for Any Price)</label>
+            <input type="number" id="edit-target-price" name="target_price" step="any" min="1" placeholder="e.g. 45000">
+            <span style="font-size:.75rem; color:var(--text-dim); margin-top:.25rem;">
+                Alert will trigger only when in-stock price drops to or below this amount.
+            </span>
+        </div>
+        <div class="actions" style="justify-content: flex-end; gap:.75rem;">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('edit-product-dialog').close()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</dialog>
+
+<script>
+    function openEditModal(id, label, price) {
+        const dialog = document.getElementById('edit-product-dialog');
+        const form = document.getElementById('edit-product-form');
+        form.action = '/products/' + id + '/edit';
+        document.getElementById('edit-label').value = label;
+        document.getElementById('edit-target-price').value = price;
+        dialog.showModal();
+    }
+</script>
 {% endblock %}
 

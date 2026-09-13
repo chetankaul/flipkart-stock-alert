@@ -15,6 +15,8 @@ class Product(db.Model):
     id           = db.Column(db.Integer, primary_key=True)
     url          = db.Column(db.String(1024), nullable=False, unique=True)
     label        = db.Column(db.String(256), default="")
+    target_price = db.Column(db.Float, nullable=True)            # Alert only if price <= target_price
+    last_price   = db.Column(db.String(32), nullable=True)       # Last observed price string e.g. "₹44,999"
     is_active    = db.Column(db.Boolean, default=True)
     last_status  = db.Column(db.String(32), default="unknown")   # "in_stock" / "out_of_stock" / "error" / "unknown"
     last_checked = db.Column(db.DateTime, nullable=True)

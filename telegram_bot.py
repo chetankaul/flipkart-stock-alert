@@ -64,23 +64,34 @@ def _handle_status(message):
             icon = {"in_stock": "🟢", "out_of_stock": "🔴",
                     "error": "⚠️"}.get(p.last_status, "⚪")
             label = p.label or p.url[:50]
-            lines.append(f"{icon} <a href='{p.url}'>{label}</a>")
+            price_info = f" (Target: ≤ ₹{int(p.target_price):,})" if p.target_price else ""
+            if p.last_price:
+                price_info += f" [Latest: {p.last_price}]"
+            lines.append(f"{icon} <a href='{p.url}'>{label}</a>{price_info}")
 
         bot.reply_to(message, "\n".join(lines))
 
 
-# ── /add <url> — add a product from Telegram ────────────────────────────────
+# ── /add <url> [max_price] — add a product from Telegram ───────────────────
 
 @bot.message_handler(commands=["add"])
 def _handle_add(message):
-    parts = message.text.split(maxsplit=1)
+    parts = message.text.split()
     if len(parts) < 2 or not _FLIPKART_URL_RE.match(parts[1].strip()):
         bot.reply_to(message,
-                     "Usage: /add <code>&lt;flipkart-url&gt;</code>\n"
-                     "URL must start with https://www.flipkart.com/")
+                     "Usage: /add <code>&lt;flipkart-url&gt;</code> <code>[max_price]</code>\n"
+                     "Example: /add https://www.flipkart.com/... 45000")
         return
 
     url = parts[1].strip()
+    target_price = None
+    if len(parts) >= 3:
+        try:
+            target_price = float(re.sub(r"[^\d.]", "", parts[2]))
+            if target_price <= 0:
+                target_price = None
+        except ValueError:
+            target_price = None
 
     with _app.app_context():
         from models import db, Product
@@ -89,14 +100,15 @@ def _handle_add(message):
             bot.reply_to(message, "ℹ️ That product is already being monitored.")
             return
 
-        db.session.add(Product(url=url))
+        db.session.add(Product(url=url, target_price=target_price))
         db.session.commit()
 
     # Trigger monitor reload so the new product starts being checked
     from monitor import reload_engine
     reload_engine()
 
-    bot.reply_to(message, "✅ Product added and monitoring started!")
+    price_msg = f" (Alert when ≤ ₹{int(target_price):,})" if target_price else ""
+    bot.reply_to(message, f"✅ Product added and monitoring started!{price_msg}")
 
 
 # ── Public API ───────────────────────────────────────────────────────────────

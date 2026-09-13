@@ -76,9 +76,24 @@ def create_app() -> Flask:
     # ── Create tables & seed defaults ─────────────────────────────────────
     with app.app_context():
         db.create_all()
+        _migrate_db()
         _seed_defaults()
 
     return app
+
+
+def _migrate_db():
+    """Ensure newly added columns exist in existing SQLite databases."""
+    import sqlalchemy as sa
+    with db.engine.connect() as conn:
+        res = conn.execute(sa.text("PRAGMA table_info(products)")).fetchall()
+        column_names = [r[1] for r in res]
+        if "target_price" not in column_names:
+            conn.execute(sa.text("ALTER TABLE products ADD COLUMN target_price REAL"))
+            conn.commit()
+        if "last_price" not in column_names:
+            conn.execute(sa.text("ALTER TABLE products ADD COLUMN last_price VARCHAR(32)"))
+            conn.commit()
 
 
 def _seed_defaults():

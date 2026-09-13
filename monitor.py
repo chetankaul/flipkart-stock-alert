@@ -5,6 +5,7 @@ every active pincode, sends alerts to all active Telegram users, and updates
 the product's status in the database.
 """
 
+import re
 import threading
 import time
 import urllib3
@@ -20,6 +21,17 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Shared bot instance for sending alerts
 _bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="HTML",
                         disable_web_page_preview=True)
+
+
+def _parse_price(val) -> float | None:
+    """Extract numeric float price from string or int/float."""
+    if val is None or str(val).strip().upper() in ("N/A", "NONE", ""):
+        return None
+    cleaned = re.sub(r"[^\d.]", "", str(val))
+    try:
+        return float(cleaned) if cleaned else None
+    except ValueError:
+        return None
 
 
 # ── Stock-check logic (ported from notifier_v3) ──────────────────────────────
@@ -117,43 +129,76 @@ def _monitor_product(product_id: int, app):
                     print(f"[Monitor] Product ID {product_id} inactive or deleted — stopping worker thread.")
                     return                              # thread exits cleanly
 
-                product_url = product.url               # plain string — safe outside ctx
-                pincodes    = [p.pincode for p in Pincode.query.filter_by(is_active=True).all()]
-                interval    = int(Setting.get("check_interval", "10"))
-                cooldown    = int(Setting.get("alert_cooldown", "300"))
+                product_url  = product.url               # plain string — safe outside ctx
+                target_price = product.target_price      # float | None
+                pincodes     = [p.pincode for p in Pincode.query.filter_by(is_active=True).all()]
+                interval     = int(Setting.get("check_interval", "10"))
+                cooldown     = int(Setting.get("alert_cooldown", "300"))
 
             if not pincodes:
                 time.sleep(interval)
                 continue
 
-            # ── Check stock (no DB/session needed here) ──────────────────
-            any_in_stock  = False
-            stock_results = []
+            # ── Check stock & parse prices (no DB/session needed here) ──
+            any_in_stock     = False
+            stock_results    = []
+            best_price_seen  = None
+            best_price_str   = None
 
             for pin in pincodes:
                 result = _check_stock(product_url, pin)
-                if result and result["available"]:
-                    any_in_stock = True
-                    stock_results.append(result)
+                if result:
+                    op_num = _parse_price(result.get("offer_price"))
+                    fp_num = _parse_price(result.get("final_price"))
+                    valid_nums = [p for p in (op_num, fp_num) if p is not None]
+                    eff_price = min(valid_nums) if valid_nums else None
+                    result["effective_price"] = eff_price
+
+                    if eff_price is not None:
+                        if best_price_seen is None or eff_price < best_price_seen:
+                            best_price_seen = eff_price
+                            best_price_str = f"₹{int(eff_price):,}"
+
+                    if result.get("available"):
+                        any_in_stock = True
+                        stock_results.append(result)
 
             now = datetime.now(IST)
 
-            # ── Update DB status ─────────────────────────────────────────
+            # Determine if alert condition is met
+            should_alert = False
+            if any_in_stock:
+                if target_price is not None:
+                    # Only alert if an in-stock offer price meets or beats the target
+                    qualifying = [
+                        r for r in stock_results
+                        if r.get("effective_price") is not None and r["effective_price"] <= target_price
+                    ]
+                    should_alert = len(qualifying) > 0
+                else:
+                    should_alert = True
+
+            # ── Update DB status & last observed price ───────────────────
             with app.app_context():
                 product = db.session.get(Product, product_id)
                 if product:
                     product.last_checked = now
                     product.last_status  = "in_stock" if any_in_stock else "out_of_stock"
+                    if best_price_str:
+                        product.last_price = best_price_str
                     db.session.commit()
 
             # Update shared health timestamp
             with _health_lock:
                 _last_check_at = now
 
-            # ── Alert if in stock ────────────────────────────────────────
-            if any_in_stock:
+            # ── Alert if in stock and meets price condition ─────────────
+            if should_alert:
                 title = stock_results[0]["title"]
-                lines = [f"<b>🟢 [In Stock] {title}</b>\n"]
+                price_tag = f" [≤ ₹{int(target_price):,}]" if target_price else ""
+                lines = [f"<b>🟢 [In Stock{price_tag}] {title}</b>\n"]
+                if target_price:
+                    lines.append(f"🎯 <b>Price Target Met:</b> ≤ ₹{int(target_price):,} (Observed: {best_price_str or 'N/A'})\n")
                 for r in stock_results:
                     lines.append(
                         f"📍 {r['pincode']}  —  LP: ₹{r['final_price']} | "

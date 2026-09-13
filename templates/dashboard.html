@@ -69,6 +69,8 @@
             <thead>
                 <tr>
                     <th>Product</th>
+                    <th>Target Price</th>
+                    <th>Last Price</th>
                     <th>Status</th>
                     <th>Last Checked</th>
                     <th>Active</th>
@@ -79,7 +81,21 @@
                 <tr>
                     <td>
                         <div class="label-cell">{{ p.label or '—' }}</div>
-                        <div class="url-cell"><a href="{{ p.url }}" target="_blank">{{ p.url[:60] }}{% if p.url|length > 60 %}…{% endif %}</a></div>
+                        <div class="url-cell"><a href="{{ p.url }}" target="_blank">{{ p.url[:50] }}{% if p.url|length > 50 %}…{% endif %}</a></div>
+                    </td>
+                    <td>
+                        {% if p.target_price %}
+                            <span class="badge badge-cyan">≤ ₹{{ "{:,.0f}".format(p.target_price) }}</span>
+                        {% else %}
+                            <span class="badge badge-dim">Any</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.last_price %}
+                            <span style="font-family:var(--font-mono); font-weight:600; color:var(--text-bright)">{{ p.last_price }}</span>
+                        {% else %}
+                            <span class="time-ago">—</span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if p.last_status == 'in_stock' %}

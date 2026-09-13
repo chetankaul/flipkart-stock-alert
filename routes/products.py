@@ -22,8 +22,9 @@ def index():
 @bp.route("/products/add", methods=["POST"])
 def add():
     """Add a new product after validating the URL."""
-    url   = request.form.get("url", "").strip()
-    label = request.form.get("label", "").strip()
+    url          = request.form.get("url", "").strip()
+    label        = request.form.get("label", "").strip()
+    target_price = request.form.get("target_price", "").strip()
 
     if not url:
         flash("URL is required.", "error")
@@ -37,7 +38,18 @@ def add():
         flash("That product is already being monitored.", "warning")
         return redirect(url_for("products.index"))
 
-    db.session.add(Product(url=url, label=label))
+    price_val = None
+    if target_price:
+        try:
+            price_val = float(target_price)
+            if price_val <= 0:
+                flash("Target price must be greater than 0.", "error")
+                return redirect(url_for("products.index"))
+        except ValueError:
+            flash("Invalid target price. Please enter a valid number.", "error")
+            return redirect(url_for("products.index"))
+
+    db.session.add(Product(url=url, label=label, target_price=price_val))
     db.session.commit()
 
     # Trigger monitor reload
@@ -45,6 +57,41 @@ def add():
     reload_engine()
 
     flash("Product added!", "success")
+    return redirect(url_for("products.index"))
+
+
+@bp.route("/products/<int:pid>/edit", methods=["POST"])
+def edit(pid):
+    """Update a product's label and target price."""
+    product = db.session.get(Product, pid)
+    if not product:
+        flash("Product not found.", "error")
+        return redirect(url_for("products.index"))
+
+    label        = request.form.get("label", "").strip()
+    target_price = request.form.get("target_price", "").strip()
+
+    product.label = label
+
+    if target_price:
+        try:
+            price_val = float(target_price)
+            if price_val <= 0:
+                flash("Target price must be greater than 0.", "error")
+                return redirect(url_for("products.index"))
+            product.target_price = price_val
+        except ValueError:
+            flash("Invalid target price. Please enter a valid number.", "error")
+            return redirect(url_for("products.index"))
+    else:
+        product.target_price = None
+
+    db.session.commit()
+
+    from monitor import reload_engine
+    reload_engine()
+
+    flash("Product updated!", "success")
     return redirect(url_for("products.index"))
 
 

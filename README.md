@@ -22,6 +22,7 @@ Get instant Telegram alerts when items come back in stock — with pricing info.
 |---------|-------------|
 | 🖥️ **Web Dashboard** | Dark, tech-themed responsive UI with real-time status cards, engine health monitoring, and live product tracking |
 | 📦 **Product Management** | Add/remove/toggle Flipkart product links with URL validation |
+| 🏷️ **Price-Based Alerts** | Set optional target maximum prices (`≤ ₹X`) — only receive alerts when price drops to or below your budget |
 | 📍 **Multi-Pincode** | Global pincode list — every product is checked against all active pincodes simultaneously |
 | 👤 **User Management** | Add Telegram users manually or let them self-register via `/start` |
 | 🤖 **Telegram Bot** | `/start` (register), `/status` (view products), `/add <url>` (add product from Telegram) |
@@ -152,8 +153,8 @@ flipkart-stock-notifier/
 | Command | Description |
 |---------|-------------|
 | `/start` | Register yourself to receive stock alerts |
-| `/status` | View all currently monitored products with status indicators |
-| `/add <url>` | Add a Flipkart product URL to monitor |
+| `/status` | View all currently monitored products with price targets and status indicators |
+| `/add <url> [max_price]` | Add a Flipkart product URL to monitor (optional max price limit) |
 
 Users are **auto-approved** on `/start` — no admin action needed.
 
