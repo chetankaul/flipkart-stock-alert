@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Settings — Stock Notifier{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>// Settings</h1>
+    <p>Configure alert timings and delivery pincodes</p>
+</div>
+
+<!-- ── Timing settings ──────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">⏱️ Alert Timings</div>
+    <form action="{{ url_for('settings.save') }}" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="check_interval">Check Interval (seconds)</label>
+                <input type="number" id="check_interval" name="check_interval"
+                       value="{{ check_interval }}" min="5" required>
+            </div>
+            <div class="form-group">
+                <label for="alert_cooldown">Alert Cooldown (seconds)</label>
+                <input type="number" id="alert_cooldown" name="alert_cooldown"
+                       value="{{ alert_cooldown }}" min="10" required>
+            </div>
+            <div class="form-group" style="flex:0 0 auto">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── Pincodes ─────────────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">📍 Delivery Pincodes</div>
+    <p style="color:var(--text-dim); font-size:.84rem; margin-bottom:1rem;">
+        Stock is checked for <strong>all active pincodes</strong> against every product.
+    </p>
+
+    <!-- add -->
+    <form action="{{ url_for('settings.add_pincode') }}" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="pincode">Pincode</label>
+                <input type="text" id="pincode" name="pincode" placeholder="e.g. 110086"
+                       maxlength="6" pattern="\d{6}" required>
+            </div>
+            <div class="form-group">
+                <label for="pin_label">Label (optional)</label>
+                <input type="text" id="pin_label" name="label" placeholder="e.g. New Delhi">
+            </div>
+            <div class="form-group" style="flex:0 0 auto">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn btn-primary">+ Add</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- list -->
+    {% if pincodes %}
+    <div class="table-wrap" style="margin-top:1rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Pincode</th>
+                    <th>Label</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pin in pincodes %}
+                <tr>
+                    <td><code>{{ pin.pincode }}</code></td>
+                    <td>{{ pin.label or '—' }}</td>
+                    <td>
+                        <form class="toggle-form" action="{{ url_for('settings.toggle_pincode', pid=pin.id) }}" method="post">
+                            <button type="submit" class="toggle-btn {{ 'on' if pin.is_active }}" title="Toggle pincode"></button>
+                        </form>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('settings.delete_pincode', pid=pin.id) }}" method="post"
+                              onsubmit="return confirm('Remove pincode {{ pin.pincode }}?')">
+                            <button type="submit" class="btn btn-danger">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:1.5rem;">
+        <p>No pincodes yet — add at least one to start checking stock.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

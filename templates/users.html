@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Users — Stock Notifier{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>// Users</h1>
+    <p>Telegram users who receive stock alerts — users can also self-register via <code>/start</code></p>
+</div>
+
+<!-- ── Add user ─────────────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">➕ Add User Manually</div>
+    <form action="{{ url_for('users.add') }}" method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="chat_id">Telegram Chat ID</label>
+                <input type="text" id="chat_id" name="chat_id" placeholder="e.g. 483701266" required>
+            </div>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="e.g. chetankaul">
+            </div>
+            <div class="form-group" style="flex:0 0 auto">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn btn-primary">+ Add</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── User list ────────────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">👤 Registered Users</div>
+
+    {% if users %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Chat ID</th>
+                    <th>Registered</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td class="label-cell">{{ u.username or '—' }}</td>
+                    <td><code>{{ u.chat_id }}</code></td>
+                    <td>
+                        {% if u.created_at %}
+                            <span class="time-ago">{{ u.created_at.strftime('%d %b %Y') }}</span>
+                        {% else %}
+                            <span class="time-ago">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form class="toggle-form" action="{{ url_for('users.toggle', uid=u.id) }}" method="post">
+                            <button type="submit" class="toggle-btn {{ 'on' if u.is_active }}" title="Toggle alerts"></button>
+                        </form>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <form action="{{ url_for('users.delete', uid=u.id) }}" method="post"
+                                  onsubmit="return confirm('Remove this user?')">
+                                <button type="submit" class="btn btn-danger">✕</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">👻</div>
+        <p>No users yet — add one above or have them message <code>/start</code> to the bot.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

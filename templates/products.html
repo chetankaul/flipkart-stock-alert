@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Products — Stock Notifier{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>// Products</h1>
+    <p>Manage Flipkart product links to monitor</p>
+</div>
+
+<!-- ── Add product ──────────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">➕ Add Product</div>
+    <form action="{{ url_for('products.add') }}" method="post">
+        <div class="form-row">
+            <div class="form-group" style="flex:3">
+                <label for="url">Flipkart URL</label>
+                <input type="url" id="url" name="url" placeholder="https://www.flipkart.com/..." required>
+            </div>
+            <div class="form-group" style="flex:1">
+                <label for="label">Label (optional)</label>
+                <input type="text" id="label" name="label" placeholder="e.g. PS5 Digital">
+            </div>
+            <div class="form-group" style="flex:0 0 auto">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn btn-primary">+ Add</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── Product list ─────────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">📦 Product List</div>
+
+    {% if products %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Status</th>
+                    <th>Last Checked</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td>
+                        <div class="label-cell">{{ p.label or '—' }}</div>
+                        <div class="url-cell"><a href="{{ p.url }}" target="_blank">{{ p.url[:60] }}{% if p.url|length > 60 %}…{% endif %}</a></div>
+                    </td>
+                    <td>
+                        {% if p.last_status == 'in_stock' %}
+                            <span class="badge badge-green">● In Stock</span>
+                        {% elif p.last_status == 'out_of_stock' %}
+                            <span class="badge badge-red">● Out of Stock</span>
+                        {% elif p.last_status == 'error' %}
+                            <span class="badge badge-yellow">⚠ Error</span>
+                        {% else %}
+                            <span class="badge badge-dim">○ Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.last_checked %}
+                            <span class="time-ago">{{ p.last_checked.strftime('%d %b %H:%M') }}</span>
+                        {% else %}
+                            <span class="time-ago">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form class="toggle-form" action="{{ url_for('products.toggle', pid=p.id) }}" method="post">
+                            <button type="submit" class="toggle-btn {{ 'on' if p.is_active }}" title="Toggle monitoring"></button>
+                        </form>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <form action="{{ url_for('products.delete', pid=p.id) }}" method="post"
+                                  onsubmit="return confirm('Remove this product?')">
+                                <button type="submit" class="btn btn-danger">✕</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">📭</div>
+        <p>No products yet — add a Flipkart URL above.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

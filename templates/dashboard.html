@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Stock Notifier{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>// Dashboard</h1>
+    <p>Real-time overview of your stock monitoring system</p>
+</div>
+
+<!-- ── Stats ────────────────────────────────────────────────────────────── -->
+<div class="stats-grid">
+    <div class="stat-card accent-cyan">
+        <div class="stat-value">{{ total_products }}</div>
+        <div class="stat-label">Products</div>
+    </div>
+    <div class="stat-card accent-green">
+        <div class="stat-value">{{ in_stock }}</div>
+        <div class="stat-label">In Stock</div>
+    </div>
+    <div class="stat-card accent-red">
+        <div class="stat-value">{{ out_of_stock }}</div>
+        <div class="stat-label">Out of Stock</div>
+    </div>
+    <div class="stat-card accent-yellow">
+        <div class="stat-value">{{ active_users }}</div>
+        <div class="stat-label">Active Users</div>
+    </div>
+</div>
+
+<!-- ── Engine health ───────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">
+        {% if engine_ok %}
+            <span class="badge badge-green">● Running</span>
+        {% else %}
+            <span class="badge badge-red">● Stopped</span>
+        {% endif %}
+        Monitor Engine
+    </div>
+    <div class="stats-grid" style="margin-bottom:0">
+        <div class="stat-card">
+            <div class="stat-value" style="font-size:1.4rem;">{{ active_threads }}</div>
+            <div class="stat-label">Active Threads</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="font-size:1.4rem;">
+                {% if last_check %}
+                    {{ last_check.strftime('%H:%M:%S') }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+            <div class="stat-label">Last Check (IST)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="font-size:1.4rem;">{{ engine_uptime or '—' }}</div>
+            <div class="stat-label">Uptime</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Product status cards ─────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-title">📡 Monitored Products</div>
+
+    {% if products %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Status</th>
+                    <th>Last Checked</th>
+                    <th>Active</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td>
+                        <div class="label-cell">{{ p.label or '—' }}</div>
+                        <div class="url-cell"><a href="{{ p.url }}" target="_blank">{{ p.url[:60] }}{% if p.url|length > 60 %}…{% endif %}</a></div>
+                    </td>
+                    <td>
+                        {% if p.last_status == 'in_stock' %}
+                            <span class="badge badge-green">● In Stock</span>
+                        {% elif p.last_status == 'out_of_stock' %}
+                            <span class="badge badge-red">● Out of Stock</span>
+                        {% elif p.last_status == 'error' %}
+                            <span class="badge badge-yellow">⚠ Error</span>
+                        {% else %}
+                            <span class="badge badge-dim">○ Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.last_checked %}
+                            <span class="time-ago">{{ p.last_checked.strftime('%H:%M:%S') }}</span>
+                        {% else %}
+                            <span class="time-ago">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.is_active %}
+                            <span class="badge badge-green">ON</span>
+                        {% else %}
+                            <span class="badge badge-dim">OFF</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">📦</div>
+        <p>No products yet — add one from the <a href="{{ url_for('products.index') }}">Products</a> page.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

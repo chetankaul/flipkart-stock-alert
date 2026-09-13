@@ -1,0 +1,27 @@
+# Environment & secrets
+.env
+
+# Database
+*.db
+instance/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Telegram session
+tg_ac.session
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
