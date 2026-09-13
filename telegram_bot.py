@@ -93,9 +93,8 @@ def _handle_add(message):
         db.session.commit()
 
     # Trigger monitor reload so the new product starts being checked
-    from app import monitor_engine
-    if monitor_engine:
-        monitor_engine.reload()
+    from monitor import reload_engine
+    reload_engine()
 
     bot.reply_to(message, "✅ Product added and monitoring started!")
 

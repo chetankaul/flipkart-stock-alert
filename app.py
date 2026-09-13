@@ -11,15 +11,15 @@ import config
 from models import db, Product, User, Pincode, Setting
 
 # Filled after app creation so other modules can import it
-monitor_engine = None
-
-
 def create_app() -> Flask:
     """Build and configure the Flask app."""
     app = Flask(__name__)
 
     app.config["SECRET_KEY"]              = config.SECRET_KEY
     app.config["SQLALCHEMY_DATABASE_URI"] = config.SQLALCHEMY_DATABASE_URI
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"timeout": 30}
+    }
 
     db.init_app(app)
 
@@ -42,15 +42,17 @@ def create_app() -> Flask:
         active_users   = User.query.filter_by(is_active=True).count()
 
         # Engine health
+        from monitor import get_engine
+        engine         = get_engine()
         engine_ok      = False
         active_threads = 0
         last_check     = None
         engine_uptime  = None
 
-        if monitor_engine:
-            active_threads = monitor_engine.active_threads
-            last_check     = monitor_engine.last_check_at
-            started        = monitor_engine.started_at
+        if engine:
+            active_threads = engine.active_threads
+            last_check     = engine.last_check_at
+            started        = engine.started_at
             engine_ok      = active_threads > 0 or total_products == 0
 
             if started:
@@ -101,9 +103,9 @@ if __name__ == "__main__":
     app = create_app()
 
     # Start the stock monitor engine
-    from monitor import MonitorEngine
-    monitor_engine = MonitorEngine(app)
-    monitor_engine.start()
+    from monitor import init_engine
+    engine = init_engine(app)
+    engine.start()
 
     # Start the Telegram bot polling
     import telegram_bot

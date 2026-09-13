@@ -41,9 +41,8 @@ def add():
     db.session.commit()
 
     # Trigger monitor reload
-    from app import monitor_engine
-    if monitor_engine:
-        monitor_engine.reload()
+    from monitor import reload_engine
+    reload_engine()
 
     flash("Product added!", "success")
     return redirect(url_for("products.index"))
@@ -57,9 +56,8 @@ def toggle(pid):
         product.is_active = not product.is_active
         db.session.commit()
 
-        from app import monitor_engine
-        if monitor_engine:
-            monitor_engine.reload()
+        from monitor import reload_engine
+        reload_engine()
 
         state = "activated" if product.is_active else "paused"
         flash(f"Product {state}.", "success")
@@ -74,9 +72,8 @@ def delete(pid):
         db.session.delete(product)
         db.session.commit()
 
-        from app import monitor_engine
-        if monitor_engine:
-            monitor_engine.reload()
+        from monitor import reload_engine
+        reload_engine()
 
         flash("Product removed.", "success")
     return redirect(url_for("products.index"))

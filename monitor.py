@@ -104,62 +104,70 @@ def _monitor_product(product_id: int, app):
     """Continuously check a single product against all active pincodes."""
     global _last_check_at
 
+    print(f"[Monitor] Worker thread started for product ID {product_id}")
+
     while True:
-        # ── Load everything we need inside a context, then detach ─────
-        with app.app_context():
-            from models import db, Product, Pincode, Setting
+        try:
+            # ── Load everything we need inside a context, then detach ─────
+            with app.app_context():
+                from models import db, Product, Pincode, Setting
 
-            product = db.session.get(Product, product_id)
-            if not product or not product.is_active:
-                return                              # thread exits cleanly
+                product = db.session.get(Product, product_id)
+                if not product or not product.is_active:
+                    print(f"[Monitor] Product ID {product_id} inactive or deleted — stopping worker thread.")
+                    return                              # thread exits cleanly
 
-            product_url = product.url               # plain string — safe outside ctx
-            pincodes    = [p.pincode for p in Pincode.query.filter_by(is_active=True).all()]
-            interval    = int(Setting.get("check_interval", "10"))
-            cooldown    = int(Setting.get("alert_cooldown", "300"))
+                product_url = product.url               # plain string — safe outside ctx
+                pincodes    = [p.pincode for p in Pincode.query.filter_by(is_active=True).all()]
+                interval    = int(Setting.get("check_interval", "10"))
+                cooldown    = int(Setting.get("alert_cooldown", "300"))
 
-        if not pincodes:
-            time.sleep(interval)
-            continue
+            if not pincodes:
+                time.sleep(interval)
+                continue
 
-        # ── Check stock (no DB/session needed here) ──────────────────
-        any_in_stock  = False
-        stock_results = []
+            # ── Check stock (no DB/session needed here) ──────────────────
+            any_in_stock  = False
+            stock_results = []
 
-        for pin in pincodes:
-            result = _check_stock(product_url, pin)
-            if result and result["available"]:
-                any_in_stock = True
-                stock_results.append(result)
+            for pin in pincodes:
+                result = _check_stock(product_url, pin)
+                if result and result["available"]:
+                    any_in_stock = True
+                    stock_results.append(result)
 
-        now = datetime.now(IST)
+            now = datetime.now(IST)
 
-        # ── Update DB status ─────────────────────────────────────────
-        with app.app_context():
-            product = db.session.get(Product, product_id)
-            if product:
-                product.last_checked = now
-                product.last_status  = "in_stock" if any_in_stock else "out_of_stock"
-                db.session.commit()
+            # ── Update DB status ─────────────────────────────────────────
+            with app.app_context():
+                product = db.session.get(Product, product_id)
+                if product:
+                    product.last_checked = now
+                    product.last_status  = "in_stock" if any_in_stock else "out_of_stock"
+                    db.session.commit()
 
-        # Update shared health timestamp
-        with _health_lock:
-            _last_check_at = now
+            # Update shared health timestamp
+            with _health_lock:
+                _last_check_at = now
 
-        # ── Alert if in stock ────────────────────────────────────────
-        if any_in_stock:
-            title = stock_results[0]["title"]
-            lines = [f"<b>🟢 [In Stock] {title}</b>\n"]
-            for r in stock_results:
-                lines.append(
-                    f"📍 {r['pincode']}  —  LP: ₹{r['final_price']} | "
-                    f"Offers: ₹{r['offer_price']}"
-                )
-            lines.append(f"\n{product_url}")
-            _send_alerts("\n".join(lines), app)
-            time.sleep(cooldown)
-        else:
-            time.sleep(interval)
+            # ── Alert if in stock ────────────────────────────────────────
+            if any_in_stock:
+                title = stock_results[0]["title"]
+                lines = [f"<b>🟢 [In Stock] {title}</b>\n"]
+                for r in stock_results:
+                    lines.append(
+                        f"📍 {r['pincode']}  —  LP: ₹{r['final_price']} | "
+                        f"Offers: ₹{r['offer_price']}"
+                    )
+                lines.append(f"\n{product_url}")
+                _send_alerts("\n".join(lines), app)
+                time.sleep(cooldown)
+            else:
+                time.sleep(interval)
+
+        except Exception as exc:
+            print(f"[Monitor] Error in worker thread for product ID {product_id}: {exc}")
+            time.sleep(10)
 
 
 # ── Engine public API ────────────────────────────────────────────────────────
@@ -200,7 +208,7 @@ class MonitorEngine:
         for p in products:
             self._launch(p.id)
 
-        print(f"[Monitor] Started {len(self._threads)} thread(s)")
+        print(f"[Monitor] Started {len(self._threads)} monitoring thread(s)")
 
     def reload(self):
         """Reconcile running threads with the current DB state.
@@ -215,11 +223,13 @@ class MonitorEngine:
         # Prune finished / stale threads
         for pid in list(self._threads):
             if not self._threads[pid].is_alive() or pid not in active_ids:
+                print(f"[Monitor] Removing stopped thread for product ID {pid}")
                 del self._threads[pid]
 
         # Start missing threads
         for pid in active_ids:
-            if pid not in self._threads:
+            if pid not in self._threads or not self._threads[pid].is_alive():
+                print(f"[Monitor] Reload detected active product ID {pid} — launching thread")
                 self._launch(pid)
 
     # ------------------------------------------------------------------
@@ -229,4 +239,30 @@ class MonitorEngine:
                              args=(product_id, self._app), daemon=True)
         t.start()
         self._threads[product_id] = t
+
+
+# ── Global Engine Instance Accessors ──────────────────────────────────────────
+
+_engine: MonitorEngine | None = None
+
+
+def init_engine(app) -> MonitorEngine:
+    """Initialize and return the global MonitorEngine singleton."""
+    global _engine
+    _engine = MonitorEngine(app)
+    return _engine
+
+
+def get_engine() -> MonitorEngine | None:
+    """Return the active MonitorEngine instance, if initialized."""
+    return _engine
+
+
+def reload_engine():
+    """Trigger a hot reload of the monitor threads against current database state."""
+    if _engine:
+        _engine.reload()
+    else:
+        print("[Monitor] Warning: reload_engine called but monitor engine is not initialized.")
+
 
