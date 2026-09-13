@@ -25,3 +25,5 @@ tg_ac.session
 # OS
 Thumbs.db
 .DS_Store
+
+notifier_v3.py
