@@ -62,7 +62,7 @@ Get instant Telegram alerts when items come back in stock — with pricing info.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/flipkart-stock-notifier.git
+git clone https://github.com/chetankaul/flipkart-stock-alert.git
 cd flipkart-stock-notifier
 ```
 
